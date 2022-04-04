@@ -342,7 +342,6 @@ int main(int argc, char* argv[]){
                     
                 } else if(strstr(msg_buffer,"RSP") != NULL) {
 
-                    //HERE NEED TO INCLUDE SHORTCUTS!!!!
                     sscanf(msg_buffer, "%s %d %d %s %s %s", command, &search.ans_key, &search.current_search_n, temp_node.key, temp_node.ip, temp_node.port);
 
                     if (search.ans_key == atoi(own_node.key)) {
@@ -492,7 +491,6 @@ int main(int argc, char* argv[]){
                     
                 } else if(strstr(msg_buffer,"RSP") != NULL) {
 
-                    //HERE NEED TO INCLUDE SHORTCUTS!!!!
                     sscanf(msg_buffer, "%s %d %d %s %s %s", command, &search.ans_key, &search.current_search_n, temp_node.key, temp_node.ip, temp_node.port);
 
                     if (search.ans_key == atoi(own_node.key)) {
