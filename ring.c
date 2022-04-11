@@ -25,6 +25,7 @@ typedef struct file_descriptors {
     int tcp_temp;
     int udp_server;
     int udp_shortcut;
+    int udp_temp;
 } file_descriptors;
 
 typedef struct search {
@@ -60,8 +61,10 @@ int main(int argc, char* argv[]){
         fd_set rset;
         bool has_shortcut = false;
         bool can_exit = false;
+        bool return_answer = false;
         search search;
         struct addrinfo hints, *res;
+        struct addrinfo prec_hints, *prec_res;
 
         search.current_search_n = -1;
         search.my_search_n = -1; //This means this node has still not made any find calls
@@ -158,6 +161,79 @@ int main(int argc, char* argv[]){
             //Creating a UDP server file descriptor
             all_fds.udp_server = UDPserver(own_node);
 
+        } else if (strcmp(command,"bentry") == 0){
+
+            sscanf(cmd_buffer, "%s %s %s %s", command, temp_node.key, temp_node.ip, temp_node.port);
+
+            //Creating the UDP file descriptor
+            all_fds.udp_temp = socket(AF_INET, SOCK_DGRAM,0);
+            if (all_fds.udp_temp == -1) exit(1);
+
+            memset(&prec_hints, 0, sizeof(prec_hints));
+            prec_hints.ai_family = AF_INET;
+            prec_hints.ai_socktype = SOCK_DGRAM;
+
+            err_code = getaddrinfo(temp_node.ip, temp_node.port, &prec_hints, &prec_res);
+            if (err_code != 0) exit(1);
+
+            //Send own node key to a node in the ring
+            memset(msg_buffer, 0, sizeof(msg_buffer));
+            sprintf(msg_buffer, "EFND %s", own_node.key);
+            err_code = sendto(all_fds.udp_temp, msg_buffer, strlen(msg_buffer), 0, prec_res->ai_addr, prec_res->ai_addrlen);
+            if (err_code == -1) exit(1);
+
+            memset(msg_buffer, 0, sizeof(msg_buffer));
+
+            //Wait for ACK
+            err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
+            if (strcmp(msg_buffer, "ACK") == 0) {
+                printf("\nSent a EFND message and received an ACK!\n\n");
+            } 
+            
+            memset(msg_buffer, 0, sizeof(msg_buffer));
+            memset(command, 0, sizeof(command));
+
+            //Wait for predecessor info
+            err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
+            sscanf(msg_buffer, "%s %s %s %s", command, pred_node.key, pred_node.ip, pred_node.port);
+
+            if (strcmp(command, "EPRED") == 0) {
+                printf("\nReceived a EPRED message!\n\n");
+            }
+
+            //Send ACK back
+            memset(msg_buffer, 0, sizeof(msg_buffer));
+            sprintf(msg_buffer, "ACK");
+            err_code = sendto(all_fds.udp_temp, msg_buffer, strlen(msg_buffer), 0, prec_res->ai_addr, prec_res->ai_addrlen);
+            if (err_code == -1) exit(1);
+
+            //Create TCP server
+            all_fds.tcp_listen = TCPserver(own_node);
+
+            //Send predecessor a SELF
+            all_fds.tcp_pred = TCPclient(pred_node);
+
+            memset(msg_buffer, 0, sizeof(msg_buffer));
+            sprintf(msg_buffer, "SELF %s %s %s", own_node.key, own_node.ip, own_node.port);
+            err_code = write(all_fds.tcp_pred, msg_buffer, strlen(msg_buffer));
+            if (err_code == -1) exit(1);
+
+            //Receive and set successor to the SELF message
+            if ((all_fds.tcp_succ = accept(all_fds.tcp_listen, (struct sockaddr*) &addr, (socklen_t *)&addrlen)) < 0) exit(1);
+
+            memset(msg_buffer, 0, sizeof(msg_buffer));
+
+            err_code = read(all_fds.tcp_succ, msg_buffer, sizeof(msg_buffer));
+            if (err_code == -1) exit(1);
+            if (sscanf(msg_buffer, "%s %s %s %s", command, succ_node.key, succ_node.ip, succ_node.port) != 4) exit(1);
+
+            //Create UDP server
+            all_fds.udp_server = UDPserver(own_node);
+
+            printf("My successor\'s info (Key/IP/Port): %s %s %s\n", succ_node.key, succ_node.ip, succ_node.port);
+            printf("My predecessor\'s info (Key/IP/Port): %s %s %s\n\n", pred_node.key, pred_node.ip, pred_node.port);
+
+
         } else if (strcmp(command, "exit") == 0) {
             
             printf("\nExiting program...\n");
@@ -188,7 +264,6 @@ int main(int argc, char* argv[]){
             
             if (FD_ISSET(all_fds.tcp_listen, &rset)){
                 
-                //printf("\nA new node is trying to enter the ring\n");
                 if ((all_fds.tcp_temp = accept(all_fds.tcp_listen, (struct sockaddr*) &addr, (socklen_t *)&addrlen)) < 0) exit(1);
 
                 //Read from new node
@@ -203,8 +278,6 @@ int main(int argc, char* argv[]){
                 if (err_code == -1) exit(1);
                 if (sscanf(msg_buffer, "%s %s %s %s", command, temp_node.key, temp_node.ip, temp_node.port) != 4) exit(1);
                 
-                //printf("\nI received a message: %s from key %s", msg_buffer, temp_node.key);
-
                 if (strcmp(command, "SELF") == 0) {
 
                     //Tell successor about his new predecessor 
@@ -346,7 +419,32 @@ int main(int argc, char* argv[]){
 
                     if (search.ans_key == atoi(own_node.key)) {
 
-                        printf("The answer is the node (Key/IP/Port): %s %s %s\n\n", temp_node.key, temp_node.ip, temp_node.port);
+                        if (!return_answer) {
+
+                            printf("The answer is the node (Key/IP/Port): %s %s %s\n\n", temp_node.key, temp_node.ip, temp_node.port);
+
+                        } else {
+
+                            printf("The answer is the node (Key/IP/Port): %s %s %s\n\n", temp_node.key, temp_node.ip, temp_node.port);
+
+                            //Send the outer node a message with his predecessor
+                            memset(msg_buffer, 0, sizeof(msg_buffer));
+                            sprintf(msg_buffer, "EPRED %s %s %s", temp_node.key, temp_node.ip, temp_node.port);
+
+                            err_code = sendto(all_fds.udp_temp, msg_buffer, strlen(msg_buffer), 0, (struct sockaddr*) &addr, addrlen);
+                            if (err_code == -1) exit(1);
+
+                            memset(msg_buffer, 0, sizeof(msg_buffer));
+
+                            //Wait for ACK
+                            err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
+                            if (strcmp(msg_buffer, "ACK") == 0) {
+                                printf("\nSent an EPRED message and received an ACK!\n\n");
+                            }
+
+                            return_answer = false;
+
+                        }
      
                     } else {
 
@@ -407,7 +505,7 @@ int main(int argc, char* argv[]){
                 err_code = sendto(all_fds.udp_server, "ACK", 4, 0, (struct sockaddr*) &addr, addrlen);
                 if (err_code == -1) exit(1);
 
-                if(strstr(msg_buffer,"FND") != NULL){
+                if(strstr(msg_buffer,"FND") != NULL && strstr(msg_buffer,".") != NULL){
 
                     sscanf(msg_buffer, "%s %d %d %s %s %s", command, &search.search_key, &search.current_search_n, temp_node.key, temp_node.ip, temp_node.port);
 
@@ -495,7 +593,34 @@ int main(int argc, char* argv[]){
 
                     if (search.ans_key == atoi(own_node.key)) {
 
-                        printf("The answer is the node (Key/IP/Port): %s %s %s\n\n", temp_node.key, temp_node.ip, temp_node.port);
+                        //QUANDO ELE ENVIA PARA UM NO QUE É ATALHO DE OUTRO DA MERDA - DEVE SER POR CAUSA DAS ESTRUTURAS DOS ENDEREÇOS!!!
+                        
+                        if (!return_answer) {
+                            
+                            printf("The answer is the node (Key/IP/Port): %s %s %s\n\n", temp_node.key, temp_node.ip, temp_node.port);
+
+                        } else {
+                            
+                            printf("The answer is the node (Key/IP/Port): %s %s %s\n\n", temp_node.key, temp_node.ip, temp_node.port);
+
+                            //Send the outer node a message with his predecessor
+                            memset(msg_buffer, 0, sizeof(msg_buffer));
+                            sprintf(msg_buffer, "EPRED %s %s %s", temp_node.key, temp_node.ip, temp_node.port);
+
+                            err_code = sendto(all_fds.udp_temp, msg_buffer, strlen(msg_buffer), 0, (struct sockaddr*) &addr, addrlen);
+                            if (err_code == -1) exit(1);
+
+                            memset(msg_buffer, 0, sizeof(msg_buffer));
+                            
+                            //Wait for ACK
+                            err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
+                            if (strcmp(msg_buffer, "ACK") == 0) {
+                                printf("\nSent an EPRED message and received an ACK!\n\n");
+                            }
+
+                            return_answer = false;
+
+                        }
      
                     } else {
 
@@ -531,8 +656,78 @@ int main(int argc, char* argv[]){
                             }
 
                         }
-
                         
+                    }
+
+                } else if (strstr(msg_buffer, "EFND") != NULL) {
+
+                    //Will need to return an answer
+                    return_answer = true;
+
+                    //If this node receives the answer from a shortcut need to save the file descriptor
+                    all_fds.udp_temp = all_fds.udp_server;
+                    printf("Will send an answer to fd %d", all_fds.udp_temp);
+
+                    sscanf(msg_buffer, "%s %d", command, &search.my_search_key);
+                    
+                    if (dist(atoi(own_node.key), search.my_search_key) < dist(atoi(succ_node.key), search.my_search_key)) {
+
+                        //Send outer node my info
+                        memset(msg_buffer, 0, sizeof(msg_buffer));
+                        sprintf(msg_buffer, "EPRED %s %s %s", own_node.key, own_node.ip, own_node.port);
+
+                        err_code = sendto(all_fds.udp_server, msg_buffer, strlen(msg_buffer), 0, (struct sockaddr*) &addr, addrlen);
+                        if (err_code == -1) exit(1);
+
+                        return_answer = false;
+                    
+                    } else {
+
+                        if (search.current_search_n < 98) {
+                            search.current_search_n++;
+                        } else {
+                            search.current_search_n = 0;
+                        }
+
+                        memset(msg_buffer, 0, sizeof(msg_buffer));
+                        
+                        printf("\nYou want to find key %d - search number %d\n", search.my_search_key, search.current_search_n);
+                        sprintf(msg_buffer, "FND %d %d %s %s %s", search.my_search_key, search.current_search_n, own_node.key, own_node.ip, own_node.port);
+
+                        if (!has_shortcut) {
+
+                            //Send FND to successor
+                            err_code = write(all_fds.tcp_succ, msg_buffer, strlen(msg_buffer));
+                            if (err_code == -1) exit(1);
+
+                        } else {    
+
+                            if (dist(atoi(shortcut_node.key), search.search_key) < dist(atoi(succ_node.key), search.search_key)) {
+
+                                //Propagate the FND message through shortcut
+                                err_code = sendto(all_fds.udp_shortcut, msg_buffer, strlen(msg_buffer), 0, res->ai_addr, res->ai_addrlen);
+                                if (err_code == -1) exit(1);
+
+                                memset(msg_buffer, 0, sizeof(msg_buffer));
+
+                                //Wait for ACK
+                                err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
+                                if (strcmp(msg_buffer, "ACK") == 0) {
+                                    printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
+                                } else {
+                                    printf("\nSomething went wrong - did not receive an ACK...\n\n");
+                                }
+
+                            } else {
+
+                                //Propagate the FND message to the successor
+                                err_code = write(all_fds.tcp_succ, msg_buffer, strlen(msg_buffer));
+                                if (err_code == -1) exit(1);
+
+                            }
+
+                        }
+
                     }
 
                 }
@@ -572,7 +767,10 @@ int main(int argc, char* argv[]){
                     }
 
                     can_exit = true;
-                    printf("\nI left the ring...\n\n");
+                    printf("\nI left the ring...");
+
+                    printf("\nExiting the program...\n");
+                    exit(0);
 
                 }
 
