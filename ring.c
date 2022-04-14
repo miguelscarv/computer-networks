@@ -56,7 +56,7 @@ int main(int argc, char* argv[]){
         char cmd_buffer[MAX_SIZE], msg_buffer[MAX_SIZE], command[10], trash[100];
         node own_node, pred_node, succ_node, shortcut_node, temp_node;
         file_descriptors all_fds;
-        struct sockaddr_in addr;
+        struct sockaddr_in addr, temp_addr;
         int addrlen = sizeof(addr);
         fd_set rset;
         bool has_shortcut = false;
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]){
         struct addrinfo prec_hints, *prec_res;
 
         search.current_search_n = -1;
-        search.my_search_n = -1; //This means this node has still not made any find calls
+        search.my_search_n = -1; 
 
         strcpy(own_node.key, argv[1]);
         strcpy(own_node.ip, argv[2]);
@@ -431,13 +431,13 @@ int main(int argc, char* argv[]){
                             memset(msg_buffer, 0, sizeof(msg_buffer));
                             sprintf(msg_buffer, "EPRED %s %s %s", temp_node.key, temp_node.ip, temp_node.port);
 
-                            err_code = sendto(all_fds.udp_temp, msg_buffer, strlen(msg_buffer), 0, (struct sockaddr*) &addr, addrlen);
+                            err_code = sendto(all_fds.udp_temp, msg_buffer, strlen(msg_buffer), 0, (struct sockaddr*) &temp_addr, addrlen);
                             if (err_code == -1) exit(1);
 
                             memset(msg_buffer, 0, sizeof(msg_buffer));
 
                             //Wait for ACK
-                            err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
+                            err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &temp_addr, (socklen_t *)&addrlen);
                             if (strcmp(msg_buffer, "ACK") == 0) {
                                 printf("\nSent an EPRED message and received an ACK!\n\n");
                             }
@@ -607,13 +607,13 @@ int main(int argc, char* argv[]){
                             memset(msg_buffer, 0, sizeof(msg_buffer));
                             sprintf(msg_buffer, "EPRED %s %s %s", temp_node.key, temp_node.ip, temp_node.port);
 
-                            err_code = sendto(all_fds.udp_temp, msg_buffer, strlen(msg_buffer), 0, (struct sockaddr*) &addr, addrlen);
+                            err_code = sendto(all_fds.udp_temp, msg_buffer, strlen(msg_buffer), 0, (struct sockaddr*) &temp_addr, addrlen);
                             if (err_code == -1) exit(1);
 
                             memset(msg_buffer, 0, sizeof(msg_buffer));
                             
                             //Wait for ACK
-                            err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
+                            err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &temp_addr, (socklen_t *)&addrlen);
                             if (strcmp(msg_buffer, "ACK") == 0) {
                                 printf("\nSent an EPRED message and received an ACK!\n\n");
                             }
@@ -664,9 +664,10 @@ int main(int argc, char* argv[]){
                     //Will need to return an answer
                     return_answer = true;
 
-                    //If this node receives the answer from a shortcut need to save the file descriptor
+                    //If this node receives the answer from a shortcut need to save the file descriptor AND THE STRUCT WITH THE NODE TO SEND EPRED
                     all_fds.udp_temp = all_fds.udp_server;
-                    printf("Will send an answer to fd %d", all_fds.udp_temp);
+                    temp_addr = addr;
+                    //printf("Will send an answer to fd %d", all_fds.udp_temp);
 
                     sscanf(msg_buffer, "%s %d", command, &search.my_search_key);
                     
