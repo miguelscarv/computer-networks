@@ -52,7 +52,7 @@ int main(int argc, char* argv[]){
     
     } else {
 
-        int err_code, max_fd, search_n = 0;
+        int err_code, max_fd;
         char cmd_buffer[MAX_SIZE], msg_buffer[MAX_SIZE], command[10], trash[100];
         node own_node, pred_node, succ_node, shortcut_node, temp_node;
         file_descriptors all_fds;
@@ -95,10 +95,11 @@ int main(int argc, char* argv[]){
             //Wait for client message
             printf("Waiting for messages...\n\n");
             if ((all_fds.tcp_temp = accept(all_fds.tcp_listen, (struct sockaddr*) &addr, (socklen_t *)&addrlen)) < 0) exit(1);
-
-            //Setting previous and successor node to the new entering node
+     
             err_code = read(all_fds.tcp_temp, msg_buffer, sizeof(msg_buffer));
             if (err_code == -1) exit(1);
+
+            //Setting previous and successor node to the new entering node
             if (sscanf(msg_buffer, "%s %s %s %s", command, succ_node.key, succ_node.ip, succ_node.port) != 4) {
                 printf("Ring with a single node received wrong arguments!\n");
                 exit(1);
@@ -187,7 +188,7 @@ int main(int argc, char* argv[]){
             //Wait for ACK
             err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
             if (strcmp(msg_buffer, "ACK") == 0) {
-                printf("\nSent a EFND message and received an ACK!\n\n");
+                //printf("\nSent a EFND message and received an ACK!\n\n");
             } 
             
             memset(msg_buffer, 0, sizeof(msg_buffer));
@@ -288,8 +289,6 @@ int main(int argc, char* argv[]){
                         err_code = write(all_fds.tcp_succ, msg_buffer, strlen(msg_buffer));
                         if (err_code == -1) exit(1);
 
-                    } else {
-                        printf("My successor with key %s left the ring!\n\n", succ_node.key);
                     }
 
                     close(all_fds.tcp_succ);
@@ -360,7 +359,7 @@ int main(int argc, char* argv[]){
                                 //Wait for ACK
                                 err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
                                 if (strcmp(msg_buffer, "ACK") == 0) {
-                                    printf("\nSent a RSP message through my shortcut and received an ACK!\n\n");
+                                    //printf("\nSent a RSP message through my shortcut and received an ACK!\n\n");
                                 } else {
                                     printf("\nSomething went wrong - did not receive an ACK...\n\n");
                                 }
@@ -397,7 +396,7 @@ int main(int argc, char* argv[]){
                                 //Wait for ACK
                                 err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
                                 if (strcmp(msg_buffer, "ACK") == 0) {
-                                    printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
+                                    //printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
                                 } else {
                                     printf("\nSomething went wrong - did not receive an ACK...\n\n");
                                 }
@@ -439,7 +438,7 @@ int main(int argc, char* argv[]){
                             //Wait for ACK
                             err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &temp_addr, (socklen_t *)&addrlen);
                             if (strcmp(msg_buffer, "ACK") == 0) {
-                                printf("\nSent an EPRED message and received an ACK!\n\n");
+                                //printf("\nSent an EPRED message and received an ACK!\n\n");
                             }
 
                             return_answer = false;
@@ -466,7 +465,7 @@ int main(int argc, char* argv[]){
                                 //Wait for ACK
                                 err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
                                 if (strcmp(msg_buffer, "ACK") == 0) {
-                                    printf("\nSent a RSP message through my shortcut and received an ACK!\n\n");
+                                    //printf("\nSent a RSP message through my shortcut and received an ACK!\n\n");
                                 } 
 
                             } else {
@@ -515,7 +514,7 @@ int main(int argc, char* argv[]){
 
                         if (!has_shortcut) {
 
-                            //Propagate the RSP message through successor
+                            //Propagate the RSP message through successor 
                             sprintf(msg_buffer, "RSP %s %d %s %s %s", temp_node.key, search.current_search_n, own_node.key, own_node.ip, own_node.port);
                             err_code = write(all_fds.tcp_succ, msg_buffer, strlen(msg_buffer));
                             if (err_code == -1) exit(1);
@@ -534,7 +533,7 @@ int main(int argc, char* argv[]){
                                 //Wait for ACK
                                 err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
                                 if (strcmp(msg_buffer, "ACK") == 0) {
-                                    printf("\nSent a RSP message through my shortcut and received an ACK!\n\n");
+                                    //printf("\nSent a RSP message through my shortcut and received an ACK!\n\n");
                                 } else {
                                     printf("\nSomething went wrong - did not receive an ACK...\n\n");
                                 }
@@ -571,7 +570,7 @@ int main(int argc, char* argv[]){
                                 //Wait for ACK
                                 err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
                                 if (strcmp(msg_buffer, "ACK") == 0) {
-                                    printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
+                                    //printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
                                 } else {
                                     printf("\nSomething went wrong - did not receive an ACK...\n\n");
                                 }
@@ -615,7 +614,7 @@ int main(int argc, char* argv[]){
                             //Wait for ACK
                             err_code = recvfrom(all_fds.udp_temp, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &temp_addr, (socklen_t *)&addrlen);
                             if (strcmp(msg_buffer, "ACK") == 0) {
-                                printf("\nSent an EPRED message and received an ACK!\n\n");
+                                //printf("\nSent an EPRED message and received an ACK!\n\n");
                             }
 
                             return_answer = false;
@@ -642,7 +641,7 @@ int main(int argc, char* argv[]){
                                 //Wait for ACK
                                 err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
                                 if (strcmp(msg_buffer, "ACK") == 0) {
-                                    printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
+                                    //printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
                                 } else {
                                     printf("\nSomething went wrong - did not receive an ACK...\n\n");
                                 }
@@ -714,7 +713,7 @@ int main(int argc, char* argv[]){
                                 //Wait for ACK
                                 err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
                                 if (strcmp(msg_buffer, "ACK") == 0) {
-                                    printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
+                                    //printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
                                 } else {
                                     printf("\nSomething went wrong - did not receive an ACK...\n\n");
                                 }
@@ -815,7 +814,7 @@ int main(int argc, char* argv[]){
 
                         } else {    
 
-                            if (dist(atoi(shortcut_node.key), search.search_key) < dist(atoi(succ_node.key), search.search_key)) {
+                            if (dist(atoi(shortcut_node.key), search.my_search_key) < dist(atoi(succ_node.key), search.my_search_key)) {
 
                                 //Propagate the FND message through shortcut
                                 err_code = sendto(all_fds.udp_shortcut, msg_buffer, strlen(msg_buffer), 0, res->ai_addr, res->ai_addrlen);
@@ -826,7 +825,7 @@ int main(int argc, char* argv[]){
                                 //Wait for ACK
                                 err_code = recvfrom(all_fds.udp_shortcut, msg_buffer, sizeof(msg_buffer), 0, (struct sockaddr*) &addr, (socklen_t *)&addrlen);
                                 if (strcmp(msg_buffer, "ACK") == 0) {
-                                    printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
+                                    //printf("\nSent a FND message through my shortcut and received an ACK!\n\n");
                                 } else {
                                     printf("\nSomething went wrong - did not receive an ACK...\n\n");
                                 }

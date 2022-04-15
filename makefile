@@ -1,2 +1,2 @@
 ring: ring.c
-	gcc ring.c -o ring
+	gcc -Wall ring.c -o ring
